@@ -62,7 +62,7 @@ Correlate domain names and IP addresses with AttackFence Threat Intel, enhancing
 
 -----
 
-## Installation & Prerequisites
+### Installation & Prerequisites
 
 Before installing DNS Detection and Analytics, ensure you have the following prerequisites installed:
 
