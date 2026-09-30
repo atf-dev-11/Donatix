@@ -11,8 +11,8 @@ script_path = os.path.dirname(os.path.abspath(__file__))
 db = r"networkdata.db"
 DB_FILE_DIR = os.path.join(script_path, db)
 ALERT_VERDICT_LIST = ['is_suspicious', 'is_malicious', 'malicious','suspicious']
-TI_LIC_KEY = "410333-523719-003261-231036-408522-421738" 
-TI_API = "https://3.109.79.47/new_feeds/?value={}&key={}"
+TI_LIC_KEY = "572593-894392-850925-172665-717646-449055" 
+TI_API = "https://172.16.2.197/new_feeds/?value={}&key={}"
 
 def create_table(table_name):
     retval = {}
@@ -151,25 +151,21 @@ async def fetch_data(session, url, indicator, sqlite_db, attack_cursor):
                 ti_data = await response.json()
                 # Check if the 'ret' key is present in the data and its value is 0
                 if 'ret' in ti_data and ti_data['ret'] == 0:
-                    # Remove unnecessary keys from the data
-                    ti_data.pop("_id")
-                    ti_data.pop("ret")
-                    ti_data.pop("last_queried_utc_time")
-                    ti_data['verdict_updated_at'] = ti_data.get('last_queried_epoch_time', None)
-                    ti_data.pop("last_queried_epoch_time")
-                    ti_data['mitre_ids'] = str(ti_data.get('ti_mitre_ids', '[]'))
-                    try:
-                        ti_data.pop("ti_mitre_ids")
-                    except:
-                        pass
-                    ti_data['ioc_type'] = ti_data.get('ioc_type', 'N/A').lower()
-                    ti_data['verdict'] = ti_data.get('ti_verdict', None)
-                    ti_data.pop("ti_verdict")
+                    # Keep only what is stored; the feed has used two sets of field names, accept either
+                    ti_data = {
+                        'dga_score': ti_data.get('dga_score'),
+                        'ioc': ti_data.get('ioc', indicator),
+                        'ioc_type': str(ti_data.get('ioc_type') or 'N/A').lower(),
+                        'verdict_updated_at': ti_data.get('verdict_updated_at', ti_data.get('last_queried_epoch_time')),
+                        'mitre_ids': str(ti_data.get('mitre_ids', ti_data.get('ti_mitre_ids', '[]'))),
+                        'verdict': ti_data.get('verdict', ti_data.get('ti_verdict')),
+                    }
                     
                     # Execute the query with the values
                     ti_query = """INSERT INTO atf_local_ti_cache (dga_score, ioc, ioc_type, verdict_updated_at, 
-                                mitre_ids, verdict) VALUES (?, ?, ?, ?, ?, ?)"""
-                    attack_cursor.execute(ti_query, tuple(ti_data.values()))
+                                mitre_ids, verdict) VALUES (:dga_score, :ioc, :ioc_type, :verdict_updated_at,
+                                :mitre_ids, :verdict)"""
+                    attack_cursor.execute(ti_query, ti_data)
 
                     # Commit the changes to the database
                     sqlite_db.commit()
@@ -179,7 +175,7 @@ async def fetch_data(session, url, indicator, sqlite_db, attack_cursor):
                     ti_data.pop('dga_score')  
                     ti_data.pop('verdict_updated_at') 
 
-                    fetch_records = attack_cursor.execute(f"select * from dns_query_data_req where ioc = '{indicator}'")
+                    fetch_records = attack_cursor.execute("select * from dns_query_data_req where ioc = ?", (indicator,))
                     for row in fetch_records.fetchall():
                         id_to_del.append(str(row['alert_id']))
                         # if ti_data['verdict'] in ['is_suspicious', 'is_malicious', 'malicious','suspicious']:
@@ -195,15 +191,8 @@ async def fetch_data(session, url, indicator, sqlite_db, attack_cursor):
                         columns_list = row_dict.keys()
                         columns_string = ",".join(columns_list)
                         values = ','.join(['?' for _ in columns_list])
-                        # check data exist for the record in table or not
-                        check_record = attack_cursor.execute(f"select id, tiVerdict from dns_query_data where id = '{row['id']}'")
-                        row = check_record.fetchone()
-                        tmp_ti_data = ti_data.copy()
-                        each = dict(row)
-                        if each['tiVerdict']:
-                            tmp_ti_data.extend(json.loads(each['tiVerdict']))
                         attack_cursor.execute("update dns_query_data set tiVerdict = ? where id = ?", (
-                            tmp_ti_data['verdict'], row['id']))
+                            ti_data['verdict'], row['id']))
                         print(f"TABLE TRANSACTION dns_query_data, OPERATION UPDATE  {attack_cursor.rowcount}")
                         sqlite_db.commit()
                     if id_to_del:
@@ -275,7 +264,7 @@ async def main():
         # Code for fetching public ip and domains from pcap_data and insert into pcap_data_req
         fetch_rawdata = execute_query("SELECT id, dnsResponse, qname FROM dns_query_data where status = 0")   # here argument should be pointer
         if fetch_rawdata['ret'] == 0 and fetch_rawdata['data']:
-            id_to_update = ()
+            id_to_update = []
             for row_data in fetch_rawdata['data']:
                 iocs = {}
                 if row_data['dnsResponse']:
@@ -284,9 +273,9 @@ async def main():
                 elif row_data['qname']:
                     iocs.update({'qname': row_data['qname']})
 
-                columns_list = row_data.keys()
-                columns_string = ",".join(columns_list)
-                values = ','.join(['?' for _ in columns_list])
+                if not iocs:
+                    # nothing to look up, mark it processed or it is rescanned on every run
+                    id_to_update.append(str(row_data['id']))
                 
                 for ioc_key, ioc in iocs.items():
                     query = f"""insert into dns_query_data_req (
@@ -295,9 +284,9 @@ async def main():
                     if ans['ret'] != 0:
                         print(f"TABLE TRANSACTION dns_query_data_req, OPERATION INSERT  {ans['ret']}")
                     else:
-                        id_to_update += (row_data['id'],)
+                        id_to_update.append(str(row_data['id']))
 
-            update_query = f"update dns_query_data set status = 1 where id in {id_to_update}"
+            update_query = "update dns_query_data set status = 1 where id in ({})".format(','.join(id_to_update))
             ans = execute_query(update_query)
             if ans['ret'] != 0:
                 print(f"TABLE TRANSACTION dns_query_data, OPERATION UPDATE  {ans['ret']}")

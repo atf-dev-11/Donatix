@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 Restart=always
-RestartSec=10
+RestartSec=300
 User=attackfence
 WorkingDirectory=/opt/attackfence/Donatix/Linux/scripts/src/
 ExecStart=/opt/attackfence/Donatix/Linux/scripts/src/dga_evaluate

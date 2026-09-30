@@ -1,0 +1,7 @@
+# Linux runs these directly; CRLF breaks the #! line, bash and systemd
+*.sh            text eol=lf
+*.service       text eol=lf
+Linux/**/*.py   text eol=lf
+# cmd needs CRLF for labels in batch files
+*.bat           text eol=crlf
+*.ps1           text eol=crlf

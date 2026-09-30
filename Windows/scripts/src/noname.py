@@ -41,7 +41,7 @@ sql_command = """
 dbasemgmt.create_table(conn, sql_command)                        
 
 count = 1
-for row in sys.argv:
+for row in sys.stdin:
     if "frame.interface_name".casefold() in row.casefold() or "capturing on".casefold() in row.casefold():
         pass
     else:

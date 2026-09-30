@@ -6,7 +6,6 @@ def create_connection(db_file):
     """ Create a database connection to a SQLITE3 database """
     conn = sqlite3.connect(db_file, check_same_thread=False)
     conn.execute('pragma journal_mode=wal')
-    print(sqlite3.version)
     return conn
 
 def create_table(conn, create_table_sql):

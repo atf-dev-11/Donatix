@@ -216,7 +216,7 @@ def fetch_and_print_data(start_time, end_time):
     # Query to retrieve dga summary data from dns_query_data table 
     
     dga_summary_response = """
-                        select src, sum(case when isDGA is not 0 then 1 else 0 end) as 
+                        select src, sum(case when isDGA = 1 then 1 else 0 end) as
                         'Number of Responses', count(*) as 'Number of Queries',
                         time from dns_query_data where time >= '{}' and 
                         time <= '{}' group by src;
@@ -381,12 +381,27 @@ def fetch_and_print_data(start_time, end_time):
 
 
 
+# DNS tunnelling encodes data into the labels below a domain the attacker controls,
+# so it shows up as a large number of DISTINCT names under one parent. Ordinary
+# high-volume traffic (mDNS above all) repeats a handful of names instead, which is
+# why the fan-out below and not the raw query count is what separates the two.
+TUNNEL_MIN_DISTINCT_NAMES = 100
+TUNNEL_MIN_QUERIES = 200
+
+
+def base_domain(qname):
+    """ The parent a name sits under, e.g. a.b.example.net -> example.net """
+    labels = (qname or "").rstrip(".").split(".")
+    return ".".join(labels[-2:]) if len(labels) >= 2 else (qname or "")
+
+
 def fetch_dns_hosts(start_time, end_time):
     tld_list = [".com", ".org", ".net", ".int", ".edu", ".gov", ".mil"]
     script_path = os.path.dirname(os.path.abspath(__file__))
     db = "networkdata.db"
     db_path = os.path.join(script_path, db)
     conn = dbasemgmt.create_connection(db_path)
+    conn.create_function("base_domain", 1, base_domain)
     top_dga_hosts_table_name = "dgaHosts"
 
     # Query to create the dga hosts data table
@@ -417,17 +432,19 @@ def fetch_dns_hosts(start_time, end_time):
 
     # Query to retrieve the dns tunneling data from dns_query_data
     dns_tunneling_query = """
-                select qname, count(*) as query_count,
+                select base_domain(qname) as base, count(*) as query_count,
                 sum(case when size is "" then 0 else 1 end) AS non_zero_payload_count,
-                (sum(case when size is "" then 0 else 1 end) / count(*)) * 100 as response_ratio,
-                time from dns_query_data where time >= '{}' and time <= '{}'  
-                group by qname HAVING query_count >= 1000 and response_ratio >= 10;
-                """.format(start_time, end_time)
+                sum(case when size is "" then 0 else 1 end) * 100 / count(*) as response_ratio
+                from dns_query_data where time >= '{}' and time <= '{}' and qname != ''
+                group by base HAVING count(distinct qname) >= {} and
+                query_count >= {} and response_ratio >= 10;
+                """.format(start_time, end_time, TUNNEL_MIN_DISTINCT_NAMES,
+                           TUNNEL_MIN_QUERIES)
 
     # Query to retrieve the dga hosts data from dns_query_data
     dga_hosts_query = """
                     select src, count(*) as dga_count from dns_query_data
-                    where isDGA = 1 group by qname order by dga_count desc;
+                    where isDGA = 1 and src != '' group by src order by dga_count desc;
                     """
 
     # Query to insert the dga hosts data into dga hosts table

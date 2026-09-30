@@ -1,5 +1,5 @@
 @echo off
-set script_path=C:\Donatix\Windows\scripts\src\beaconingHosts.py
+set script_path=%~dp0..\src\beaconingHosts.py
 
-schtasks /create /sc minute /mo 1440 /tn "findBeaconingHosts" /tr "python %script_path%" /ru INTERACTIVE /rl HIGHEST
+schtasks /create /sc daily /tn "findBeaconingHosts" /tr "pythonw \"%script_path%\"" /ru INTERACTIVE /rl HIGHEST /f
 

@@ -32,7 +32,8 @@ sql_command = """
                         dnsResponse text,
                         isDGA integer,
                         tiVerdict text,
-                        status integer default 0
+                        status integer default 0,
+                        created_at TIMESTAMP DEFAULT (strftime('%s', 'now'))
                     );
                 """.format(table_name)
 

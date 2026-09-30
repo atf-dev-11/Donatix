@@ -42,8 +42,8 @@ def fetch_dns_hosts(start_time, end_time):
     dns_tunneling_query = """
                 select qname, count(*) as query_count,
                 sum(case when size is "" then 0 else 1 end) AS non_zero_payload_count,
-                (sum(case when size is "" then 0 else 1 end) / count(*)) * 100 as response_ratio,
-                time from dns_query_data where time >= '{}' and time <= '{}'  
+                sum(case when size is "" then 0 else 1 end) * 100 / count(*) as response_ratio
+                from dns_query_data where time >= '{}' and time <= '{}'  
                 group by qname HAVING query_count >= 1000 and response_ratio >= 10;
                 """.format(start_time, end_time)
     

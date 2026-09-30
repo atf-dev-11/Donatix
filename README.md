@@ -23,7 +23,7 @@ DNS Detection and Analytics is released as an open-source tool to enable users t
 
 - [Installation](#installation)
 - [Usage](#usage)
-- [Power-BI Details](#)
+- [PDF Report](#pdf-report)
 - [Configuration](#configuration)
 - [Contributing](#contributing)
 - [License](#license)
@@ -64,38 +64,18 @@ Correlate domain names and IP addresses with AttackFence Threat Intel, enhancing
 
 ## Installation & Prerequisites
 
-Before installing DNS Detection and Analytics, ensure you have the following prerequisites installed:
+The installers check for the following prerequisites and install whatever is missing:
 
 - Python: DNS Detection and Analytics requires Python. If you don't have Python installed, you can download and install it from the official [Python website](https://www.python.org/downloads/). The version must be lower than or equal to 3.11
   Download the exe file and run it on your system
 - Wireshark: Although the package only requires Tshark but in Windows operating system you need to download the executable file of Wireshark from the Wireshark official [Wireshark website](https://www.wireshark.org/download.html). The tshark will be installed with it as well.
-- Install Power BI for visualization:
-  - Download and install Power BI Desktop from [Power BI Desktop](https://powerbi.microsoft.com/en-us/desktop/)
+- Python packages: aiohttp and matplotlib (matplotlib generates the PDF report).
 
 ## Usage
 ### For Windows.
-  - Run the powershell as administrator and run this command ```Set-ExecutionPolicy -RemoteSigned``` .
-  - Run Donatix.exe to run the project from Windows Directory.
-  - Power BI Setup:
-    - Install Power BI Desktop on the New Machine:
-      - In the new Power BI Desktop > Right click,  
-      - Run as administrator.
-      - go to File > Open and select the donatix.pbit file at location ‘C:\Donatix\Windows\scripts\src\donatix.pbit’.
-      - It will start showing data.
-    
-    - Update Data Source Credentials (if applicable):
-    If you used username/password or other credentials to connect to the SQLite database, you might need to update them for the new machine.
-    Change the source path: Go to File > Options and settings > Data source settings  .
-    
-    - Refresh Data:
-    Right-click on the dataset and select Refresh to ensure the connection and data are up-to-date.
-    
-    - Additional Considerations:
-      - Gateway Configuration: If you used a gateway for data access, configure it appropriately on the new machine.
-      - Visual Customizations: Any custom visuals you used need to be installed on the new machine as well.
-      - Shared Data Sources: If the original data source is shared, ensure the new machine has access to it.
-      - Version Compatibility: Use compatible Power BI versions on both machines to avoid issues.
-
+  - Run Donatix.exe from Windows Directory. It installs the project to C:\Donatix, installs any missing prerequisite (Python, Wireshark, aiohttp, matplotlib) and creates the scheduled tasks.
+  - To run from a source checkout instead of installing, run install.bat from Windows Directory (it asks for administrator rights).
+  - Donatix.exe is built from Donatix.iss with Inno Setup (```ISCC.exe Donatix.iss```) and must be rebuilt after changing any script.
     - Open task schedular application and go into the task schedular library and Run the following tasks with highest privileges.
       -   DNSDataAnalytics.
       -   TiAnalytics.
@@ -107,142 +87,26 @@ Before installing DNS Detection and Analytics, ensure you have the following pre
 ### For Linux.
   - Run ``` sudo ./installPackages.sh ``` from Linux Directory.
 
-## Power-BI Details
-### Slide 1:
-  - Count of Threat Intel Verdict:
-    - Purpose: Count of Threat Intel Verdict like benign, unknown, suspicious, malicious, etc.
-    - Data Source:dns_query_data.
-    - Fields:
-      - Values = Count of tiVerdict ,
-      - Category = tiVerdict.
-  - Unknown Communication By Host:
-    - Purpose: Count of Unknown Communication by Host.
-    - Data Source:dns_query_data .
-    - Fields: 
-      - Values = Count of Unknown tiVerdict, 
-      - Category = src.
-  - Suspicious Communication By Host:
-    - Purpose: Count of Suspicious Communication by Host.
-    - Data Source:dns_query_data .
-    - Fields: 
-      - Values = Count of Unknown tiVerdict, 
-      - Category = src.
+## Uninstall
+  - Windows: run uninstall.bat from Windows Directory (it asks for administrator rights).
+  - Linux: run ``` sudo bash uninstall.sh ``` from Linux Directory.
 
-### Slide 2:
-  - Sum Of Label Length By Date:
-    - Purpose: Sum of averageLabelLen, Sum of maximumLabelLen, and Sum of minimumLabelLen by Date.
-    - Data Source: labelCountLength.
-    - Fields: 
-      - Values = averageLavelLen, maximumLabelLength, minimumLabelLengt,  
-      - Category = Date.
-  - Number Of Queries and Responses By Date:
-    - Purpose: Total number of queries and Responses by date.
-    - Data Source:queryResponseSummary.
-    - Fields: 
-      - Values = Sum of numQueries and numResponses, etc., 
-      - Category = numQueries, numResponses.
-  - Sum Of Query length By Date:
-    - Purpose: Sum of averageQueryLen, Sum of maximumQueryLen, and Sum of minimumQueryLen by Date.
-    - Data Source:queryNameLength .
-    - Fields: 
-      - Values = Sum of averageQueryLen, Sum of maximumQueryLen, and Sum of minimumQueryLen, 
-      - Category = Date.
-  - Sum Of DNS Record By Date:
-    - Purpose: Sum of query type (e.g., A, AAAA, TXT) by Date.
-    - Data Source: queryTypeBreakUp.
-    - Fields: 
-      - Values = Sum of Arecord, AAAArecord, OtherRecord., 
-      - Category = Date.
-  - Count Of Response Codes by Date:
-    - Purpose: Count Of Response Code like (0,1,2,3 etc) By Date.
-    - Data Source: responseCodeBreakUp.
-    - Fields:  
-      - Values =Count of noResponse, rcodeOne, rcodeThree, rcodeTwo, rcodeZero.
-      - Category = Date.
+Both remove the scheduled tasks / services and the installed scripts, and ask before deleting the captured DNS data. The prerequisites (Python, Wireshark/Tshark, aiohttp, matplotlib and the other packages) are left installed.
 
-### Slide 3:
-  - Sum Of Queries and Responses By Source:
-    - Purpose: Total number of queries and Responses by Source.
-    - Data Source: tldConversationSummary.
-    - Fields: 
-      - Values = Sum of numQueries and numResponses, etc., 
-      - Category = srcIp.
-  - Count of Top Label Domains ( tld):
-    - Purpose: Count of Top Label Domains ( tld).
-    - Data Source: tldConversationSummary.
-    - Fields: 
-      - Values =Count of tld, 
-      - Category = tld.
+## PDF Report
+The analytics and detections are published as a PDF, generated on demand from the captured data.
 
-### Slide 4:
-  - Top Domains By Query Volume
-      - Purpose: Identify most frequently queried domains.
-      - Data Source: dns_query_data
-      - Fields:
-        - Values = Count of qname,
-        - Category = qname
-  - Response Code Distribution
-      - Purpose: Understand response code occurrences (e.g., successful, failed).
-      - Data Source: responseCodeBreakUp
-      - Fields:
-        - Values = Count of rcodeZero, rcodeOne, etc.,
-        - Category = rcodeZero, rcodeOne, etc.
-  - Top DNS Servers
-      - Purpose: Identify most used DNS servers.
-      - Data Source: dns_query_data
-      - Fields:
-        - Values = Count of dst,
-        - Category = dst.
-  - Query Type Distribution
-      - Purpose: Understand query type usage (e.g., A, AAAA, TXT).
-      - Data Source: queryTypeBreakUp.
-      - Fields:
-        - Values = Count of Arecord, AAAArecord, etc.,
-        - Category = Arecord, AAAArecord, etc.
-  - Average TLD Conversation Length
-      - Purpose: Analyze query lengths for different TLDs
-      - Data Source: tldConversationSummary.
-      - Fields:
-        - Axis = tld,
-        - Values = averageQueryLength.
-  - Total DNS Queries
-      - Purpose: Monitor overall DNS activity and potential load.
-      - Data Source: queryResponseSummary table
-      - Fields:
-        - Value: totalQueryCount
-      - Example Appearance: Large number with label "Total DNS Queries: 123,456".
-        
-### Slide 5:
-  - Average DGA Score By Source
-    - Purpose: Analyze DGA scores by sources.
-    - Data Source: dgaSummary.
-    - Fields:
-      - Values = Average of isDGA ,
-      - Category = src.
-  - Average DGA Score by Source And Date
-    - Purpose: Analyze DGA scores by sources and date.
-    - Data Source: dgaSummary.
-    - Fields:
-      - Values = Average of isDGA,
-      - Category = src, date.
-  - Top 10 Source with Max DGA Scores.
-    - Purpose: Monitor overall Source with their DGA Scores.
-    - Data Source: dgaSummary table
-    - Fields:
-      - Value = Max of isDGA,
-      - Category = src.
-        
-### Slide 6:
-  - DNS Activity By User:
-    - Purpose: Visualize DNS query and response patterns for individual users to identify unusual behavior or potential threats.
-    - Data Source: dns_query_data table
-    - Fields:
-      - X-axis: Time (e.g., day, Month, Year),
-      - Y-axis: Query/response count.
+  - Windows: run ```python generateReport.py``` from the Windows\scripts\src directory.
+  - Linux: run ```sudo -u attackfence python3 /opt/attackfence/Donatix/Linux/scripts/src/generateReport.py -o /tmp/Donatix_Report.pdf```
 
-  - No Of Domains Visited By User:
-    - Purpose: Reveals the most frequented domains by individual users for insights into browsing habits and potential risks.
-    - Data Source: dns_query_data table
-    - Fields:
-      - Values: Query count for each domain
+Options:
+  - ```-o report.pdf``` : where to write the report (default: Donatix_Report_<date>.pdf in the current directory).
+  - ```--days N``` : only report on the last N days (default: all captured data).
+
+Report contents:
+  - Page 1, Overview: number of DNS queries, responses, hosts, domains queried, DGA domains and malicious/suspicious indicators, and queries/responses over time.
+  - Page 2, Traffic Breakdown: query types (A, AAAA, PTR, ...), response codes, top level domains and DNS servers by queries.
+  - Page 3, Hosts and Domains: top domains, queries by host, distinct domains visited by host, and query name length, label count and TTL statistics.
+  - Page 4, Threat Intelligence and DGA Detection: threat intel verdicts, flagged indicators, DGA queries by host and DGA domains.
+  - Page 5, Beaconing and DNS Tunneling Detection: beaconing hosts and DNS tunneling domains.
 

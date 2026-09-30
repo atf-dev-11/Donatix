@@ -216,7 +216,7 @@ def fetch_and_print_data(start_time, end_time):
     # Query to retrieve dga summary data from dns_query_data table 
     
     dga_summary_response = """
-                        select src, sum(case when isDGA is not 0 then 1 else 0 end) as 
+                        select src, sum(case when isDGA = 1 then 1 else 0 end) as
                         'Number of Responses', count(*) as 'Number of Queries',
                         time from dns_query_data where time >= '{}' and 
                         time <= '{}' group by src;

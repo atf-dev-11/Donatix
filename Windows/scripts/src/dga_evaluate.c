@@ -15,45 +15,40 @@
 void fetch_domains_from_db(sqlite3 *db, struct ndpi_detection_module_struct *ndpi_str, int verbose) {
     sqlite3_stmt *stmt;
     int rc;
-    const char *update_query = "UPDATE dns_query_data SET isDGA = 1 WHERE qname = ?;";
-    char query[] = "SELECT qname FROM dns_query_data WHERE qname != '';";
+    const char *update_query = "UPDATE dns_query_data SET isDGA = ? WHERE qname = ?;";
+    /* isDGA IS NULL means not yet evaluated. Every name is marked afterwards,
+       1 for a DGA hit and 0 for a clean name, so no name is examined twice. */
+    char query[] = "SELECT DISTINCT qname FROM dns_query_data WHERE qname != '' AND isDGA IS NULL;";
     int num_detections = 0;
     rc = sqlite3_prepare_v2(db, query, -1, &stmt, 0);
     if (rc == SQLITE_OK) {
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             const char *hostname = (const char*)sqlite3_column_text(stmt, 0);
-            if (ndpi_check_dga_name(ndpi_str, NULL, hostname, 1, 1)) {
-                if (verbose)
-                    printf("========\n");
-                    // Prepare the update statement
-                    sqlite3_stmt *stmt_update;
-                    rc = sqlite3_prepare_v2(db, update_query, -1, &stmt_update, 0);
-                    if (rc != SQLITE_OK) {
-                        fprintf(stderr, "Failed to prepare update statement: %s\n", sqlite3_errmsg(db));
-                        // Handle the error and return or exit
-                    }
-                    // Bind the 'hostname' variable to the update statement
-                    rc = sqlite3_bind_text(stmt_update, 1, hostname, -1, SQLITE_STATIC);
-                    if (rc != SQLITE_OK) {
-                        fprintf(stderr, "Failed to bind parameter: %s for hostname: %s\n", sqlite3_errmsg(db), hostname);
-                        // Handle the error and return or exit
-                    }
+            int is_dga = ndpi_check_dga_name(ndpi_str, NULL, hostname, 1, 1) ? 1 : 0;
+            sqlite3_stmt *stmt_update;
 
-                    // Execute the update query
-                    rc = sqlite3_step(stmt_update);
-                    if (rc != SQLITE_DONE) {
-                        fprintf(stderr, "Update failed: %s for hostname: %s\n", sqlite3_errmsg(db), hostname);
-                    } else {
-                        fprintf(stdout, "Update successful\n");
-                    }
-                    // Finalize the update statement for the next iteration
-                    sqlite3_finalize(stmt_update);
-                    num_detections++;
-            } else {
-                if (verbose)
-                    printf("NON DGA %s\n", hostname);
-                    printf("------\n");
+            if (verbose)
+                printf(is_dga ? "DGA %s\n" : "NON DGA %s\n", hostname);
+
+            rc = sqlite3_prepare_v2(db, update_query, -1, &stmt_update, 0);
+            if (rc != SQLITE_OK) {
+                fprintf(stderr, "Failed to prepare update statement: %s\n", sqlite3_errmsg(db));
+                continue;  /* nothing to bind or step against */
             }
+            if (sqlite3_bind_int(stmt_update, 1, is_dga) != SQLITE_OK ||
+                sqlite3_bind_text(stmt_update, 2, hostname, -1, SQLITE_STATIC) != SQLITE_OK) {
+                fprintf(stderr, "Failed to bind parameters: %s for hostname: %s\n",
+                        sqlite3_errmsg(db), hostname);
+                sqlite3_finalize(stmt_update);
+                continue;
+            }
+
+            if (sqlite3_step(stmt_update) != SQLITE_DONE) {
+                fprintf(stderr, "Update failed: %s for hostname: %s\n", sqlite3_errmsg(db), hostname);
+            } else if (is_dga) {
+                num_detections++;
+            }
+            sqlite3_finalize(stmt_update);
         }
     } else {
         fprintf(stderr, "Failed to execute the query: %s\n", sqlite3_errmsg(db));
@@ -73,7 +68,10 @@ int main(int argc, char **argv) {
     ndpi_set_protocol_detection_bitmask2(ndpi_str, &all);
     ndpi_finalize_initialization(ndpi_str);
     sqlite3 *db;
-    int rc = sqlite3_open("C:\\Donatix\\Windows\\scripts\\src\\networkdata.db", &db);
+    /* Path may be given as argv[1]; the compiled-in default is the Windows install. */
+    const char *db_path = (argc > 1) ? argv[1]
+                                     : "C:\\Donatix\\Windows\\scripts\\src\\networkdata.db";
+    int rc = sqlite3_open(db_path, &db);
 
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
